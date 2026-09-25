@@ -1,0 +1,3 @@
+# Only dependency: the GCS client, used solely to read/write bucket objects.
+# NO graph libraries are used anywhere in this project.
+google-cloud-storage>=2.10.0

@@ -1,0 +1,8 @@
+Fri Sep 25 04:22:44 UTC 2026
+Python 3.13.7
+ProductName:		macOS
+ProductVersion:		27.0
+BuildVersion:		26A428
+hw.model: Mac16,8
+machdep.cpu.brand_string: Apple M4 Pro
+hw.memsize: 25769803776

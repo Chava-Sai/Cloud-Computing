@@ -1,0 +1,67 @@
+============================================================
+Loading files and building the graph...
+  ...read 1000/12000 files
+  ...read 2000/12000 files
+  ...read 3000/12000 files
+  ...read 4000/12000 files
+  ...read 5000/12000 files
+  ...read 6000/12000 files
+  ...read 7000/12000 files
+  ...read 8000/12000 files
+  ...read 9000/12000 files
+  ...read 10000/12000 files
+  ...read 11000/12000 files
+  ...read 12000/12000 files
+Loaded 12000 nodes, 1946934 link-slots (edges w/ dups) from gs://thermal-circle-508221-m7-hw2/hw2/
+Graph build + read time: 1943.12s
+
+============================================================
+LINK STATISTICS
+
+Incoming links across all pages:
+  average : 162.2445
+  median  : 162.0000
+  max     : 233
+  min     : 115
+  five quintile upper endpoints (linear-interpolated percentiles):
+    20th : 152.0000
+    40th : 159.0000
+    60th : 165.0000
+    80th : 173.0000
+   100th : 233.0000
+
+Outgoing links across all pages:
+  average : 162.2445
+  median  : 162.0000
+  max     : 323
+  min     : 0
+  five quintile upper endpoints (linear-interpolated percentiles):
+    20th : 65.0000
+    40th : 130.0000
+    60th : 195.0000
+    80th : 260.0000
+   100th : 323.0000
+
+(stats time: 0.001s)
+
+============================================================
+PAGERANK (hand-coded iterative algorithm)
+  iter   1  sum=1.000000  sum-change=0.000000%  L1-change=8.7758%
+  iter   2  sum=1.000000  sum-change=0.000000%  L1-change=0.9758%
+  iter   3  sum=1.000000  sum-change=0.000000%  L1-change=0.1158%
+Stopping rule 'both' met after 3 iterations (threshold 0.5%). Time: 0.32s
+Top 5 pages by PageRank:
+  1. page 5207.html   PR = 0.00019553   (in=183, out=144)
+  2. page 7443.html   PR = 0.00018286   (in=196, out=86)
+  3. page 7400.html   PR = 0.00017964   (in=159, out=247)
+  4. page 950.html   PR = 0.00017441   (in=143, out=123)
+  5. page 369.html   PR = 0.00017332   (in=185, out=7)
+
+============================================================
+CLOSENESS CENTRALITY (hand-coded BFS from every node)
+Note: single-threaded BFS over all nodes; this is the slowest step.
+Best closeness centrality: page 10376.html  score = 0.50464735
+Closeness time: 126.10s
+
+============================================================
+TOTAL wall time: 2069.55s
