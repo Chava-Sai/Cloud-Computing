@@ -6,9 +6,11 @@ mocked, so no bucket, network connection, or credentials are needed.
 import contextlib
 import io
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from analyze import load_from_gcs
+from analyze import load_from_gcs, load_with_transfer_manager
 
 try:
     from google.cloud import storage
@@ -55,6 +57,61 @@ class StorageLoadingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'hw2/0.html.*0/1 pages read') as caught:
                 load_from_gcs('test-bucket', 'hw2/')
         self.assertIsInstance(caught.exception.__cause__, TimeoutError)
+
+    def test_parallel_downloads_finish_before_parsing_and_match_graph(self):
+        from google.cloud.storage import transfer_manager
+        from graphlib_hw import parse_links
+        # 101 files force two batches. Node 0 links to 1 twice and to itself;
+        # node 1 links to 100, which has no outgoing links.
+        ids = list(range(101))
+        blobs = {i: SimpleNamespace(name=f"hw2/{i}.html") for i in ids}
+        batches = []
+        paths = []
+
+        def download(pairs, **kwargs):
+            self.assertEqual(kwargs['worker_type'], transfer_manager.THREAD)
+            self.assertEqual(kwargs['max_workers'], 8)
+            batches.append(len(pairs))
+            for blob, filename in pairs:
+                paths.append(Path(filename))
+                node = int(Path(filename).stem)
+                body = ('<a HREF="1.html"><a HREF="1.html"><a HREF="0.html">'
+                        if node == 0 else '<a HREF="100.html">' if node == 1 else '')
+                Path(filename).write_text(body, encoding='utf-8')
+            return [None] * len(pairs)
+
+        def parse(text):
+            self.assertEqual(batches, [100, 1], 'Parsing started before all downloads finished')
+            return parse_links(text)
+
+        with patch.object(transfer_manager, 'download_many', side_effect=download), \
+             patch('analyze.parse_links', side_effect=parse), \
+             contextlib.redirect_stdout(io.StringIO()):
+            graph = load_with_transfer_manager(blobs, ids, 8, (10, 60), None)
+        self.assertEqual(graph.n, 101)
+        self.assertEqual(graph.out_links[0], [1, 1, 0])
+        self.assertEqual(graph.out_links[1], [100])
+        self.assertEqual(sum(graph.out_counts), 4)
+        self.assertTrue(all(not path.exists() for path in paths))
+
+    def test_parallel_failure_removes_files_and_does_not_parse(self):
+        from google.cloud.storage import transfer_manager
+        paths = []
+
+        def download(pairs, **kwargs):
+            for blob, filename in pairs:
+                paths.append(Path(filename))
+                Path(filename).write_text('partial data')
+            return [TimeoutError('read timed out')]
+
+        with patch.object(transfer_manager, 'download_many', side_effect=download), \
+             patch('analyze.load_from_local') as parse, \
+             contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(RuntimeError, 'hw2/0.html'):
+                load_with_transfer_manager({0: SimpleNamespace(name='hw2/0.html')},
+                                           [0], 8, (10, 60), None)
+        parse.assert_not_called()
+        self.assertTrue(all(not path.exists() for path in paths))
 
 
 if __name__ == '__main__':

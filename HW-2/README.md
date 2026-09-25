@@ -5,7 +5,9 @@ Chava-Sai | CS528 Cloud Computing
 This program reads 12,000 linked HTML pages from Google Cloud Storage and
 computes incoming and outgoing link statistics, PageRank, and directed
 closeness centrality. Parsing and graph algorithms use Python's standard
-library. The analysis runs sequentially and does not use graph libraries.
+library. Graph processing runs on one thread and does not use graph libraries.
+Optional parallel downloads use Google Storage's built-in transfer manager,
+as permitted by the instructor's Piazza clarification.
 
 ## Project details
 
@@ -37,6 +39,7 @@ python3 -u analyze.py \
   --bucket thermal-circle-508221-m7-hw2 \
   --prefix hw2/ \
   --expected-nodes 12000 \
+  --download-workers 8 \
   --convergence both \
   --verbose-pr
 ```
@@ -48,11 +51,23 @@ Google Cloud credentials are not required to analyze the public bucket.
 
 Object listing uses responses of at most 100 entries containing only names,
 generations, and the next-page token. Keeping that token allows the client to
-retrieve the entire directory. Downloads remain sequential. Network requests
+retrieve the entire directory. Network requests
 use a 10-second connection timeout and a 60-second read-inactivity timeout,
 with a 300-second retry budget for transient failures. An attempt already in
 progress may finish after the retry budget. Progress is printed during listing
 and after every 100 downloads; a failed download identifies its object name.
+
+`--download-workers 1` (the default) downloads and parses one file at a time.
+`--download-workers 8` uses eight workers managed by
+`google.cloud.storage.transfer_manager.download_many`. Downloads are submitted
+in batches of 100 to provide progress updates. All files are downloaded into a
+fresh temporary directory before any parsing begins. After the final batch
+completes successfully, parsing, graph construction, statistics, PageRank, and
+closeness run sequentially on the main thread. Temporary files are removed on
+completion or failure; runs do not reuse cached downloads. Allow approximately
+1 GB of temporary disk space. Listing, downloading, and parsing timings are
+printed separately in transfer-manager mode, as well as the combined loading
+time. Use the same worker count for all three environment benchmarks.
 
 ## Files
 
@@ -65,7 +80,7 @@ and after every 100 downloads; a failed download identifies its object name.
 | `test_pagerank.py` | PageRank tests on small graphs with known properties. |
 | `test_closeness.py` | Closeness tests with manually calculated distances. |
 | `test_regressions.py` | Unified test discovery and additional correctness checks. |
-| `test_gcs_io.py` | SDK pagination and failed-download tests, with no network requests. |
+| `test_gcs_io.py` | SDK pagination, download failures, and processing order tests, with no network requests. |
 | `requirements.txt` | Direct dependency: `google-cloud-storage`. |
 | `results/` | Saved run output, test output, and environment details. |
 
@@ -130,6 +145,7 @@ Both checks succeeded; the file request returned HTTP 200.
 | `--convergence l1` | Check the total absolute movement of individual ranks. |
 | `--convergence both` | Require both stopping checks; the default and the recorded run's mode. |
 | `--verbose-pr` | Print total rank and both change measurements each iteration. |
+| `--download-workers N` | Download worker count; default `1`, use `8` for library-managed parallel downloads only. |
 | `--authenticated` | Use Google application default credentials instead of anonymous access. |
 | `--skip-closeness` | Omit closeness for troubleshooting; not used in the complete run. |
 
@@ -194,9 +210,9 @@ single-threaded.
 
 ## Correctness tests
 
-Run all tests with `python3 -m unittest discover -v`. The suite contains 25
-tests. The original 23 tests passed on both the laptop and Cloud Shell; the
-expanded 25-test suite passed locally after the listing change. Tests are independent
+Run all tests with `python3 -m unittest discover -v`. The suite contains 27
+tests. The earlier 25-test suite passed on the laptop and Cloud Shell; the
+expanded 27-test suite passed locally after adding transfer-manager downloads. Tests are independent
 of the generated 12,000-page graph.
 
 PageRank checks include symmetric graphs, exact nonuniform scores from solved
@@ -204,13 +220,16 @@ equations, dangling nodes, duplicate links, and the difference between the two
 stopping criteria. Closeness checks include paths, stars, isolated nodes, and
 both BFS implementations compared with an independently implemented
 Floyd-Warshall distance calculation on all 512 directed three-node graphs.
-Additional tests check parsing, statistics, dataset validation, and anonymous
-bucket loading.
+Additional tests check parsing, statistics, dataset validation, anonymous
+bucket loading, and pagination. Transfer tests verify that all downloads finish
+before parsing starts and that failed transfers remove temporary files without
+returning a partial graph.
 
 ## Recorded laptop results
 
-This recorded run used the previous loading settings: default listing responses
-and default network retries. The graph algorithms are unchanged.
+This recorded run used sequential downloads, default listing responses, and
+default network retries. It is a sequential baseline, not a measurement of the
+optional parallel downloader. The graph algorithms are unchanged.
 
 The complete bucket run used Python 3.13.7 on an Apple M4 Pro Mac with 24 GiB
 of memory. It loaded all 12,000 pages from the public bucket.

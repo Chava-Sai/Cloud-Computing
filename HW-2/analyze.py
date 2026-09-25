@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-analyze.py -- CS528 HW2 main program (SINGLE-THREADED, no graph libraries).
+analyze.py -- CS528 HW2 analysis (single-threaded graph algorithms).
 
 Opens a Google Cloud Storage bucket, lists the HTML files under a prefix,
 reads each one, builds an in-memory directed multigraph, and computes:
@@ -29,6 +29,7 @@ Typical bucket layout expected:
 import argparse
 import os
 import re
+import tempfile
 import time
 
 from graphlib_hw import WebGraph, parse_links
@@ -62,8 +63,10 @@ def load_from_local(directory):
     return g, n
 
 
-def load_from_gcs(bucket_name, prefix, authenticated=False):
+def load_from_gcs(bucket_name, prefix, authenticated=False, download_workers=1):
     """Read all N.html blobs under prefix from a GCS bucket. Returns (graph,n)."""
+    if download_workers < 1:
+        raise ValueError("download_workers must be at least 1")
     from google.cloud import storage  # imported lazily so --local needs no SDK
     from google.cloud.storage.retry import DEFAULT_RETRY
     client = storage.Client() if authenticated else storage.Client.create_anonymous_client()
@@ -73,6 +76,7 @@ def load_from_gcs(bucket_name, prefix, authenticated=False):
 
     # Small partial responses avoid downloading unnecessary object metadata.
     # Keep nextPageToken so the SDK visits EVERY page, not just the first 100.
+    t_list = time.perf_counter()
     log("Listing objects (up to 100 per response)...")
     blobs = client.list_blobs(
         bucket_name, prefix=prefix, page_size=100,
@@ -90,6 +94,10 @@ def load_from_gcs(bucket_name, prefix, authenticated=False):
     ids = sorted(id_to_blob)
     validate_ids(ids)
     n = len(ids)
+    log(f"Object listing time: {time.perf_counter() - t_list:.2f}s")
+    if download_workers > 1:
+        return load_with_transfer_manager(id_to_blob, ids, download_workers,
+                                          request_timeout, retry), n
     log(f"Found {n} numbered pages. Downloading sequentially...")
 
     g = WebGraph(n)
@@ -109,6 +117,37 @@ def load_from_gcs(bucket_name, prefix, authenticated=False):
             log(f"  ...read {k + 1}/{n} files")
     g.finalize()
     return g, n
+
+
+def load_with_transfer_manager(id_to_blob, ids, workers, request_timeout, retry):
+    """Library-managed downloads first; parse and construct the graph afterwards."""
+    from google.cloud.storage import transfer_manager
+
+    n = len(ids)
+    log(f"Found {n} numbered pages. Downloading with {workers} Google transfer-manager workers...")
+    # A fresh directory means every run reads all objects from the bucket.
+    # It is removed automatically after parsing, including if a download fails.
+    with tempfile.TemporaryDirectory(prefix="hw2-downloads-") as directory:
+        t_download = time.perf_counter()
+        for start in range(0, n, 100):
+            batch = ids[start:start + 100]
+            pairs = [(id_to_blob[i], os.path.join(directory, f"{i}.html")) for i in batch]
+            log(f"  downloading files {start + 1}-{start + len(batch)}/{n}")
+            results = transfer_manager.download_many(
+                pairs, worker_type=transfer_manager.THREAD, max_workers=workers,
+                download_kwargs={"timeout": request_timeout, "retry": retry},
+                raise_exception=False,
+            )
+            for (blob, _), result in zip(pairs, results):
+                if result is not None:
+                    raise RuntimeError(f"Download failed for {blob.name}; this run is incomplete.") from result
+            log(f"  ...downloaded {start + len(batch)}/{n} files")
+        log(f"Download time: {time.perf_counter() - t_download:.2f}s")
+        log("All downloads finished. Parsing and constructing the graph on one thread...")
+        t_parse = time.perf_counter()
+        graph, _ = load_from_local(directory)
+        log(f"Parse + graph construction time: {time.perf_counter() - t_parse:.2f}s")
+    return graph
 
 
 # ------------------------------------------------------------------- reporting
@@ -142,12 +181,18 @@ def main():
                     help="PageRank stopping rule: literal sum, L1 movement, or both (default)")
     ap.add_argument("--authenticated", action="store_true",
                     help="Use Google credentials; default reads the public bucket anonymously")
+    ap.add_argument("--download-workers", type=int, default=1,
+                    help="Google transfer-manager download workers (default 1; use 8 for parallel I/O only)")
     ap.add_argument("--expected-nodes", type=int,
                     help="Fail if the dataset size differs (use 12000 for HW2)")
     ap.add_argument("--skip-closeness", action="store_true",
                     help="Skip the (slow) closeness centrality computation")
     ap.add_argument("--verbose-pr", action="store_true", help="Print PageRank iterations")
     args = ap.parse_args()
+    if args.download_workers < 1:
+        ap.error("--download-workers must be at least 1")
+    if args.local and args.download_workers != 1:
+        ap.error("--download-workers applies only to --bucket")
 
     t_all = time.perf_counter()
 
@@ -159,7 +204,7 @@ def main():
         g, n = load_from_local(args.local)
         source = f"local dir '{args.local}'"
     else:
-        g, n = load_from_gcs(args.bucket, args.prefix, args.authenticated)
+        g, n = load_from_gcs(args.bucket, args.prefix, args.authenticated, args.download_workers)
         source = f"gs://{args.bucket}/{args.prefix}"
     if args.expected_nodes is not None and n != args.expected_nodes:
         ap.error(f"Expected {args.expected_nodes} pages but loaded {n}")
@@ -198,7 +243,7 @@ def main():
     if not args.skip_closeness:
         log("\n" + "=" * 60)
         log("CLOSENESS CENTRALITY (hand-coded BFS from every node)")
-        log("Note: single-threaded BFS over all nodes; this is the slowest step.")
+        log("Single-threaded BFS over all nodes.")
         t0 = time.perf_counter()
         best, score, _ = g.best_closeness()
         t_cc = time.perf_counter() - t0
