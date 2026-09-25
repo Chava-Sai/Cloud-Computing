@@ -1,0 +1,17 @@
+{
+  "creation_time": "2026-09-25T04:07:55+0000",
+  "default_storage_class": "STANDARD",
+  "generation": 1790309275677343428,
+  "location": "US-CENTRAL1",
+  "location_type": "region",
+  "metageneration": 2,
+  "name": "thermal-circle-508221-m7-hw2",
+  "public_access_prevention": "inherited",
+  "soft_delete_policy": {
+    "effectiveTime": "2026-09-25T04:07:55.941000+00:00",
+    "retentionDurationSeconds": "604800"
+  },
+  "storage_url": "gs://thermal-circle-508221-m7-hw2/",
+  "uniform_bucket_level_access": true,
+  "update_time": "2026-09-25T04:08:55+0000"
+}

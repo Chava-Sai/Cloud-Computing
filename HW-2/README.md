@@ -16,7 +16,7 @@ as permitted by the instructor's Piazza clarification.
 | Google Cloud project ID | `thermal-circle-508221-m7` |
 | Bucket | `thermal-circle-508221-m7-hw2` |
 | Region | `us-central1` |
-| Object directory | `hw2/` |
+| Object directories | `hw2/` (uncompressed), `hw2-gzip/` (gzip content encoding) |
 | Pages | `0.html` through `11999.html` |
 | Generator arguments | `-n 12000 -m 325` |
 | Repository | https://github.com/Chava-Sai/Cloud-Computing.git |
@@ -39,7 +39,7 @@ python3 -u analyze.py \
   --bucket thermal-circle-508221-m7-hw2 \
   --prefix hw2/ \
   --expected-nodes 12000 \
-  --download-workers 8 \
+  --download-workers 32 \
   --convergence both \
   --verbose-pr
 ```
@@ -58,7 +58,7 @@ progress may finish after the retry budget. Progress is printed during listing
 and after every 100 downloads; a failed download identifies its object name.
 
 `--download-workers 1` (the default) downloads and parses one file at a time.
-`--download-workers 8` uses eight workers managed by
+`--download-workers 32` uses 32 workers managed by
 `google.cloud.storage.transfer_manager.download_many`. Downloads are submitted
 in batches of 100 to provide progress updates. All files are downloaded into a
 fresh temporary directory before any parsing begins. After the final batch
@@ -83,6 +83,20 @@ time. Use the same worker count for all three environment benchmarks.
 | `test_gcs_io.py` | SDK pagination, download failures, and processing order tests, with no network requests. |
 | `requirements.txt` | Direct dependency: `google-cloud-storage`. |
 | `results/` | Saved run output, test output, and environment details. |
+
+## Report
+
+The Overleaf source is [report/HW2_Report.tex](report/HW2_Report.tex).
+Upload it with [report/billing.png](report/billing.png), select pdfLaTeX,
+and compile the report. It includes the measured outputs, algorithm and test
+explanations, setup and cleanup instructions, billing evidence and limitations,
+and the required disclosure of AI assistance.
+
+The billing screenshot shows current-month project totals of $0.01 usage cost,
+-$0.01 savings, and $0.00 net for September 1-25, 2026. This is not an isolated
+final HW2 cost: the same project was used for HW1, and recent billing data had
+not fully updated. The report explains how to retrieve assignment-period costs
+and records the instructor's clarification concerning delayed billing.
 
 ## Dataset and bucket setup
 
@@ -136,7 +150,7 @@ Both checks succeeded; the file request returned HTTP 200.
 | Parameter | Meaning |
 | --- | --- |
 | `--bucket NAME` | Read pages from the specified bucket. |
-| `--prefix PATH` | Directory prefix inside the bucket; this dataset uses `hw2/`. |
+| `--prefix PATH` | Directory prefix inside the bucket; use `hw2/` or `hw2-gzip/`. |
 | `--local DIRECTORY` | Read local pages instead of the bucket. |
 | `--expected-nodes N` | Reject a dataset with a different number of pages; use `12000`. |
 | `--damping D` | PageRank damping factor; default `0.85`. |
@@ -145,7 +159,7 @@ Both checks succeeded; the file request returned HTTP 200.
 | `--convergence l1` | Check the total absolute movement of individual ranks. |
 | `--convergence both` | Require both stopping checks; the default and the recorded run's mode. |
 | `--verbose-pr` | Print total rank and both change measurements each iteration. |
-| `--download-workers N` | Download worker count; default `1`, use `8` for library-managed parallel downloads only. |
+| `--download-workers N` | Download worker count; default `1`, use `32` for library-managed parallel downloads only. |
 | `--authenticated` | Use Google application default credentials instead of anonymous access. |
 | `--skip-closeness` | Omit closeness for troubleshooting; not used in the complete run. |
 
@@ -211,9 +225,8 @@ single-threaded.
 ## Correctness tests
 
 Run all tests with `python3 -m unittest discover -v`. The suite contains 27
-tests. The earlier 25-test suite passed on the laptop and Cloud Shell; the
-expanded 27-test suite passed locally after adding transfer-manager downloads. Tests are independent
-of the generated 12,000-page graph.
+tests, all of which passed on the laptop, Cloud Shell, and VM. Tests are
+independent of the generated 12,000-page graph.
 
 PageRank checks include symmetric graphs, exact nonuniform scores from solved
 equations, dangling nodes, duplicate links, and the difference between the two
@@ -225,7 +238,115 @@ bucket loading, and pagination. Transfer tests verify that all downloads finish
 before parsing starts and that failed transfers remove temporary files without
 returning a partial graph.
 
-## Recorded laptop results
+## Recorded results across three environments
+
+All three completed runs used source commit `2dd9507`, 32 Google transfer-manager
+download workers, `--expected-nodes 12000`, `--convergence both`, and
+`--verbose-pr`. Each run listed and read all 12,000 objects from the public
+bucket and returned exit code 0. Graph processing remained single-threaded.
+
+| Setting | Laptop | Cloud Shell | VM |
+| --- | --- | --- | --- |
+| Python | 3.13.7 | 3.12.3 | 3.11.2 |
+| Platform | Apple M4 Pro, macOS 27.0, 24 GiB RAM | Linux, Intel Xeon at 2.20 GHz | Debian 12, e2-medium, AMD EPYC 7B12 |
+| Prefix | `hw2/` | `hw2-gzip/` | `hw2/` |
+| Object encoding | Uncompressed | gzip | Uncompressed |
+
+| Stage (seconds) | Laptop | Cloud Shell | VM |
+| --- | ---: | ---: | ---: |
+| Object listing | 10.92 | 28.59 | 4.69 |
+| Download | 111.23 | 136.99 | 112.08 |
+| Parse and graph construction | 1.23 | 4.02 | 3.50 |
+| Combined loading stage | 123.99 | 170.32 | 120.99 |
+| Link statistics | 0.001 | 0.005 | 0.004 |
+| PageRank | 0.29 | 0.90 | 0.63 |
+| Closeness | 102.67 | 255.93 | 339.36 |
+| Total wall time | 226.96 | 427.16 | 460.99 |
+
+Combined loading includes listing, downloading, parsing, and other loader
+overhead; it is not an additional stage to add to those component timings.
+These are individual measurements, not averages of repeated trials.
+
+All runs produced 1,946,934 link occurrences, the same incoming and outgoing
+statistics, the same top five PageRank pages shown below, and the same best
+closeness page, `10376.html`, with score `0.50464735`.
+
+### Cloud Shell downloads and gzip
+
+Uncompressed Cloud Shell downloads were slow and repeatedly timed out. In the
+32-worker attempt, a read timeout exhausted the 300-second retry budget for
+`hw2/2701.html`; the program correctly rejected the incomplete run. This
+failed attempt is retained separately from the completed measurements.
+
+The same generated HTML files were uploaded to `hw2-gzip/` with gzip content
+encoding. From the directory containing `files_12k`, the upload command was:
+
+```bash
+gcloud storage cp 'files_12k/*.html' \
+  gs://thermal-circle-508221-m7-hw2/hw2-gzip/ \
+  --gzip-local=html \
+  --project=thermal-circle-508221-m7
+```
+
+The object names remain `0.html` through `11999.html`; decompression preserves
+the original HTML. A Cloud Shell check downloaded `0.html` as 1,576 compressed
+bytes and confirmed that the normal Python client download returned the same
+97,586-byte HTML as explicit gzip decompression. The raw compressed request
+took 0.19 seconds and the normal decoded request took 0.11 seconds.
+
+The completed Cloud Shell command was:
+
+```bash
+python3 -u analyze.py \
+  --bucket thermal-circle-508221-m7-hw2 \
+  --prefix hw2-gzip/ \
+  --expected-nodes 12000 \
+  --download-workers 32 \
+  --convergence both \
+  --verbose-pr
+```
+
+Low CPU usage during the earlier download phase, network read timeouts, and
+successful downloads after reducing transferred bytes are consistent with a
+network bottleneck in that Cloud Shell session. These observations do not
+establish a particular bandwidth quota or prove provider throttling. Increasing
+parallelism alone did not solve the problem. Compression greatly reduces the
+repeated filler text in the generated files.
+
+Cloud Shell used different object encoding from the laptop and VM, so these
+end-to-end times are not a controlled comparison of network performance.
+The graph algorithms and logical dataset were the same. Closeness took the
+most computation time; differences in processor performance, available CPU
+resources, and Python versions can affect it. The laptop was fastest for this
+stage. Downloads on the laptop and the VM took nearly the same time.
+
+### Saved evidence and VM cleanup
+
+- [Laptop completed output](results/laptop-parallel-bucket-run.txt), [environment](results/laptop-parallel-environment.txt), [packages](results/laptop-parallel-packages.txt), and [tests](results/laptop-parallel-tests.txt).
+- [Cloud Shell completed output](results/cloudshell-gzip-bucket-run.txt), [environment](results/cloudshell-gzip-environment.txt), [packages](results/cloudshell-packages.txt), and [tests](results/cloudshell-tests.txt).
+- [Cloud Shell gzip check](results/cloudshell-gzip-check.txt) and [failed uncompressed attempt](results/cloudshell-32-failed-01.txt).
+- [VM completed output](results/vm-parallel-bucket-run.txt), [environment](results/vm-environment.txt), [packages](results/vm-packages.txt), and [tests](results/vm-tests.txt).
+- [Bucket configuration](results/bucket-configuration.json) and [public-read IAM policy](results/bucket-iam-policy.json).
+
+The VM was `hw2-vm`, an `e2-medium` in `us-central1-a`, with Debian 12 and a
+10 GB standard persistent boot disk. After the results were copied to the
+laptop, it was deleted with:
+
+```bash
+gcloud compute instances delete hw2-vm \
+  --project=thermal-circle-508221-m7 \
+  --zone=us-central1-a \
+  --delete-disks=boot \
+  --quiet
+```
+
+The [saved VM configuration](results/vm-configuration.yaml) records the machine
+before deletion. The [deletion output](results/vm-deletion.txt) confirms deletion;
+subsequent [instance](results/vm-after-deletion.json) and
+[disk](results/vm-disks-after-deletion.json) queries both returned empty lists.
+The public bucket remains available for grading.
+
+## Earlier sequential laptop baseline
 
 This recorded run used sequential downloads, default listing responses, and
 default network retries. It is a sequential baseline, not a measurement of the

@@ -1,0 +1,4 @@
+Compressed download: 1576 bytes
+Download time: 0.19s
+Normal client download: 0.11s
+PASS: client automatically decoded the original HTML.

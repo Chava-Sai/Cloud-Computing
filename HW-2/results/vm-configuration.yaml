@@ -1,0 +1,27 @@
+creationTimestamp: '2026-09-25T09:13:14.793-07:00'
+disks:
+- architecture: X86_64
+  autoDelete: true
+  boot: true
+  deviceName: persistent-disk-0
+  diskSizeGb: '10'
+  guestOsFeatures:
+  - type: UEFI_COMPATIBLE
+  - type: VIRTIO_SCSI_MULTIQUEUE
+  - type: GVNIC
+  - type: SEV_CAPABLE
+  - type: SEV_LIVE_MIGRATABLE_V2
+  - type: SUSPEND_SAFE_FPR
+  index: 0
+  interface: SCSI
+  kind: compute#attachedDisk
+  licenses:
+  - https://www.googleapis.com/compute/v1/projects/debian-cloud/global/licenses/debian-12-bookworm
+  mode: READ_WRITE
+  source: https://www.googleapis.com/compute/v1/projects/thermal-circle-508221-m7/zones/us-central1-a/disks/hw2-vm
+  type: PERSISTENT
+id: '3452232588844540789'
+machineType: https://www.googleapis.com/compute/v1/projects/thermal-circle-508221-m7/zones/us-central1-a/machineTypes/e2-medium
+name: hw2-vm
+status: RUNNING
+zone: https://www.googleapis.com/compute/v1/projects/thermal-circle-508221-m7/zones/us-central1-a

@@ -1,0 +1,573 @@
+% Upload this file to Overleaf and select pdfLaTeX as the compiler.
+% No external .bib file, code files, or special compiler options are needed.
+% Upload billing.png together with this source, or import the supplied ZIP.
+\documentclass[10pt,letterpaper]{article}
+\usepackage[margin=0.7in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\DisableLigatures{encoding = *, family = tt*}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{xcolor,graphicx,listings,enumitem,fancyhdr}
+\usepackage{xurl}
+\usepackage[colorlinks=true,linkcolor=blue!45!black,urlcolor=blue!45!black]{hyperref}
+
+% ---------- Report details ----------
+\newcommand{\BillingImage}{billing.png}
+% ------------------------------------
+
+\definecolor{codebg}{HTML}{F4F6F8}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\setlength{\emergencystretch}{2em}
+\setlist{nosep,leftmargin=*}
+\renewcommand{\arraystretch}{1.12}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\lstset{basicstyle=\ttfamily\footnotesize,backgroundcolor=\color{codebg},
+  frame=single,rulecolor=\color{black!12},breaklines=true,
+  columns=fullflexible,keepspaces=true,showstringspaces=false,upquote=true,
+  aboveskip=7pt,belowskip=7pt,xleftmargin=4pt,xrightmargin=4pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Homework -2}
+\fancyhead[R]{\small U44607487}
+\fancyfoot[C]{\small\thepage}
+\setlength{\headheight}{14pt}
+\hypersetup{pdftitle={Homework 2: Cloud Storage and Graph Analysis},
+  pdfauthor={Srinivasa Sai Chava},pdfsubject={Cloud Storage and Graph Analysis}}
+\newcommand{\repo}{\url{https://github.com/Chava-Sai/Cloud-Computing.git}}
+
+\begin{document}
+\thispagestyle{empty}
+\noindent
+\begin{minipage}[t]{0.59\linewidth}
+\vspace{0pt}
+{\LARGE\bfseries Homework -2}\par
+\vspace{4pt}
+{\large Cloud Storage and Graph Analysis}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.39\linewidth}
+\vspace{0pt}
+\raggedleft
+{\fontsize{14}{18}\selectfont\bfseries Srinivasa Sai Chava\par}
+\vspace{4pt}
+{\fontsize{14}{18}\selectfont U44607487\par}
+\end{minipage}
+\par\vspace{12pt}
+
+\section{Project and dataset}
+The program reads 12,000 HTML pages from Google Cloud Storage, constructs a
+directed graph, and computes link statistics, PageRank, and outward closeness
+centrality. Graph parsing and algorithms are implemented using Python's standard
+library; no graph library is used. Only downloads use parallel workers, through
+Google's storage transfer manager, as permitted by the instructor's Piazza
+clarification. Parsing and graph computations run on one thread.
+
+\begin{tabularx}{\linewidth}{@{}lY@{}}
+\toprule
+Project ID & \texttt{thermal-circle-508221-m7} \\
+Bucket & \texttt{thermal-circle-508221-m7-hw2} \\
+Location / storage class & \texttt{us-central1} / Standard \\
+Object prefixes & \texttt{hw2/} (original); \texttt{hw2-gzip/} (gzip encoding) \\
+Dataset & \texttt{0.html} through \texttt{11999.html}; 1,946,934 link occurrences \\
+Code repository & \repo \\
+Measured source revision & \texttt{2dd9507d8905feb5878bf435c7c910dbff195396} \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Generating and uploading the pages}
+The supplied generator's logic was retained, including \texttt{random.seed(0)}.
+It was run with 12,000 files and the maximum-reference parameter set to 325:
+\begin{lstlisting}
+mkdir -p files_12k
+cd files_12k
+python3 ../generate.py -n 12000 -m 325
+cd ..
+\end{lstlisting}
+The generator uses exclusive upper bounds in both \texttt{randrange(1,max\_refs)}
+and \texttt{range(1,num\_refs)}. Consequently, its actual outgoing link count
+ranges from 0 to 323 when the parameter is 325. Duplicate links and self-links
+are part of the generated data and are preserved.
+
+\subsection{Bucket setup and public permissions}
+Billing was enabled for the project. The following commands created the regional
+bucket, granted public reading and listing, and uploaded the original pages:
+\begin{lstlisting}
+gcloud config set project thermal-circle-508221-m7
+gcloud storage buckets create gs://thermal-circle-508221-m7-hw2 \
+  --project=thermal-circle-508221-m7 --location=us-central1 \
+  --default-storage-class=STANDARD --uniform-bucket-level-access
+gcloud storage buckets add-iam-policy-binding \
+  gs://thermal-circle-508221-m7-hw2 \
+  --member=allUsers --role=roles/storage.objectViewer
+gcloud storage rsync files_12k \
+  gs://thermal-circle-508221-m7-hw2/hw2/ --recursive \
+  --project=thermal-circle-508221-m7
+\end{lstlisting}
+Uniform bucket-level access uses IAM instead of per-object ACLs. The
+\texttt{allUsers} binding grants anonymous object reading and listing. The
+\texttt{hw2/} directory is an object-name prefix; no separate directory object
+is required. The bucket remains public for grading.
+
+\clearpage
+\section{Running and verifying the program}
+The public repository can be cloned without repository credentials. The Python
+program uses an anonymous storage client by default, so graders do not need
+Google credentials to read the bucket.
+\begin{lstlisting}
+git clone https://github.com/Chava-Sai/Cloud-Computing.git
+cd Cloud-Computing/HW-2
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 -m unittest discover -v
+python3 -u analyze.py \
+  --bucket thermal-circle-508221-m7-hw2 \
+  --prefix hw2/ --expected-nodes 12000 \
+  --download-workers 32 --convergence both --verbose-pr
+\end{lstlisting}
+For the completed Cloud Shell run, the same command used
+\texttt{--prefix hw2-gzip/}. That prefix is also available to graders.
+To reproduce the recorded dependency versions, install
+\texttt{results/laptop-packages.txt} instead of \texttt{requirements.txt}.
+The measurements used Python 3.13.7 on the laptop, 3.12.3 in Cloud Shell, and
+3.11.2 on the VM. Commands are run from the repository's \texttt{HW-2} folder.
+
+\subsection{VM setup}
+An \texttt{e2-medium} VM was created in \texttt{us-central1-a}, in the same
+region as the bucket, with Debian 12 and a 10 GB standard persistent boot disk.
+\begin{lstlisting}
+gcloud services enable compute.googleapis.com \
+  --project=thermal-circle-508221-m7
+gcloud compute instances create hw2-vm \
+  --project=thermal-circle-508221-m7 --zone=us-central1-a \
+  --machine-type=e2-medium \
+  --image-family=debian-12 --image-project=debian-cloud \
+  --boot-disk-size=10GB --boot-disk-type=pd-standard \
+  --no-service-account --no-scopes
+gcloud compute ssh hw2-vm \
+  --project=thermal-circle-508221-m7 --zone=us-central1-a
+\end{lstlisting}
+Inside the VM, Python environment tools and Git were installed before cloning
+the repository and running the commands above:
+\begin{lstlisting}
+sudo apt-get update
+sudo apt-get install -y python3-pip python3-venv git
+\end{lstlisting}
+The VM did not need a service account because bucket access was public. An SSH
+key was required for login; the working assignment key was selected with
+\texttt{--ssh-key-file="\$HOME/.ssh/hw2\_compute\_engine"}.
+
+\subsection{Checking public access}
+The anonymous object-list request succeeded, and downloading \texttt{0.html}
+returned HTTP 200 and 97,586 bytes. These commands repeat those checks:
+\begin{lstlisting}
+curl --fail --silent --show-error \
+ 'https://storage.googleapis.com/storage/v1/b/thermal-circle-508221-m7-hw2/o?prefix=hw2%2F&maxResults=1'
+curl --fail --silent --show-error --output /tmp/hw2-public-0.html \
+ --write-out 'HTTP status: %{http_code}\n' \
+ 'https://storage.googleapis.com/thermal-circle-508221-m7-hw2/hw2/0.html'
+\end{lstlisting}
+
+\clearpage
+\section{Graph representation and PageRank}
+\subsection{Parsing and degree statistics}
+Each numbered file is one node. A case-insensitive regular expression extracts
+the generator's numeric \texttt{href="ID.html"} links. The parser targets the
+supplied file format rather than arbitrary web HTML. Page IDs must be contiguous,
+and links to IDs outside the dataset are rejected.
+
+\texttt{out\_links[i]} stores every target occurrence in page \(i\).
+The outgoing count is the list length. Reverse adjacency stores pairs of source
+ID and multiplicity; incoming counts sum all link occurrences. A repeated link
+therefore contributes more than once to degrees and PageRank. Both sums of
+degrees equal the total number of link occurrences.
+
+For incoming and outgoing counts separately, the program reports average,
+median, maximum, minimum, and five quintile upper endpoints: P20, P40, P60,
+P80, and P100. This gives nine values in each direction, following the Piazza
+clarification. P100 repeats the maximum. For sorted values \(x_0,\ldots,x_{n-1}\),
+the percentile at fraction \(q\) uses position \(h=(n-1)q\), interpolating
+linearly between its neighboring indices.
+
+\subsection{Iterative PageRank}
+Every node starts with rank \(1/n\). Let \(d=0.85\), \(C(T)\) be the outgoing
+link count, and \(m_{TA}\) the number of links from \(T\) to \(A\). Each iteration
+uses only the previous rank vector:
+\[
+p_{k+1}(A)=\frac{0.15}{n}
+ +0.85\sum_{T:C(T)>0}\frac{m_{TA}\,p_k(T)}{C(T)}
+ +\frac{0.85}{n}\sum_{T:C(T)=0}p_k(T).
+\]
+The middle term is the assignment's incoming-link contribution formula. The
+last term handles dangling pages (zero outgoing links) by distributing their
+rank uniformly. This avoids division by zero and preserves total rank.
+
+\subsection{Stopping rule and its limitation}
+The assignment's literal stopping measurement is
+\[
+\Delta_{\mathrm{sum}}=100\,
+\frac{|\sum_A p_{k+1}(A)-\sum_A p_k(A)|}{\sum_A p_k(A)}.
+\]
+It is available through \texttt{--convergence sum}, with the required default
+threshold of 0.5\%. Since dangling redistribution conserves total rank, this
+criterion can stop after one iteration even while individual ranks change.
+The recorded runs use \texttt{--convergence both}, which additionally requires
+\[
+\Delta_{L1}=100\,
+\frac{\sum_A|p_{k+1}(A)-p_k(A)|}{\sum_A p_{k+1}(A)}\leq0.5.
+\]
+Thus, both the specified total-rank condition and a rank-vector stability check
+must hold. This additional check is an explicit implementation choice, not a
+different interpretation attributed to the instructor. The program raises an
+error if its iteration limit is reached without convergence. The reported
+scores are approximate values at the selected tolerance.
+
+\subsection{Cost of the computation}
+With \(n\) nodes and \(m\) link occurrences, building the adjacency structure
+requires \(O(n+m)\) work and storage, excluding the HTML text itself. Each
+PageRank iteration traverses nodes and reverse edges, requiring at most
+\(O(n+m)\) work. Degree percentiles require sorting the \(n\) counts.
+
+\clearpage
+\section{Closeness centrality and independent tests}
+\subsection{Directed outward closeness}
+Distances follow outgoing links. For a source \(u\), let \(R_u\) be the number
+of other reachable nodes and \(S_u\) the sum of their shortest-path distances.
+The score uses reachability normalization:
+\[
+\operatorname{CC}(u)=
+\begin{cases}
+\displaystyle\frac{R_u}{n-1}\frac{R_u}{S_u},&R_u>0\text{ and }n>1,\\[5pt]
+0,&\text{otherwise}.
+\end{cases}
+\]
+For a node that reaches the entire graph, this reduces to \((n-1)/S_u\).
+The reachability factor prevents a node reaching only a tiny component from
+receiving the same score as a well-connected node with equally short distances.
+Duplicate edges do not shorten a path, and self-links add no new reachable node.
+
+Breadth-first search (BFS) computes distances from every source, and the node
+with the largest score is selected. The queue implementation explores nodes
+in distance order. For graphs larger than 2,000 nodes, the implementation uses
+Python integer bitmasks for neighbor sets, visited nodes, and BFS frontiers.
+At each level it unions the outgoing neighbor masks and removes visited nodes;
+the number of newly reached nodes multiplied by the level contributes to the
+distance sum. The bitmask implementation still runs on one thread. Conventional
+all-source BFS has \(O(n(n+m))\) worst-case work; bit operations reduce Python
+loop overhead, but large integer operations are not constant-time.
+
+\subsection{PageRank test with an exact solution}
+An independent three-node graph has edges
+\(0\to1\), \(0\to2\), \(1\to2\), and \(2\to0\). With \(d=0.85\), its stationary
+ranks satisfy
+\[
+x=0.05+0.85z,\qquad y=0.05+0.425x,\qquad
+z=0.05+0.425x+0.85y.
+\]
+Solving gives
+\[
+(x,y,z)=\left(\frac{686}{1769},\frac{380}{1769},\frac{703}{1769}\right).
+\]
+The regression test uses a tighter threshold of \(10^{-10}\) percent and checks
+these expected fractions to 11 decimal places. Another exact test uses the
+two-node graph \(0\to1\), where node 1 dangles; the expected ranks are
+\((20/57,37/57)\). Symmetric cycles, duplicate links, rank conservation, and
+early stopping under the literal sum rule are also tested.
+
+\subsection{Closeness tests with independent distances}
+For the directed path \(0\to1\to2\to3\), the scores are
+\((1/2,4/9,1/3,0)\); node 0 is best. For a bidirectional four-node star,
+the center's distances are \(1,1,1\), giving score 1; a leaf has distances
+\(1,2,2\), giving score \(3/5\).
+An exhaustive regression test constructs all \(2^9=512\) directed three-node
+graphs, including self-links, and compares both BFS implementations against
+an independently coded Floyd--Warshall distance algorithm. It also introduces
+duplicate links. These tests do not use the randomly generated 12,000 pages.
+
+\begin{tabularx}{\linewidth}{@{}Yrr@{}}
+\toprule Environment & Tests passed & Test time (s) \\ \midrule
+Laptop & 27 & 0.026 \\
+Cloud Shell & 27 & 0.060 \\
+VM & 27 & 0.072 \\ \bottomrule
+\end{tabularx}
+Other tests cover degree statistics, invalid or missing pages, pagination,
+download failure handling, and completion of downloads before parsing begins.
+
+\clearpage
+\section{Analysis output}
+All three successful runs loaded \textbf{12,000 nodes} and
+\textbf{1,946,934 link occurrences}. They returned the same link statistics,
+top five pages, and maximum closeness score. Incoming and outgoing averages
+agree because every directed link contributes once to each total.
+
+\subsection{Link statistics across all pages}
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule Statistic & Incoming links & Outgoing links \\ \midrule
+Average & 162.2445 & 162.2445 \\
+Median & 162 & 162 \\
+Maximum & 233 & 323 \\
+Minimum & 115 & 0 \\
+P20 & 152 & 65 \\
+P40 & 159 & 130 \\
+P60 & 165 & 195 \\
+P80 & 173 & 260 \\
+P100 & 233 & 323 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{PageRank iterations and top five pages}
+The \texttt{both} stopping rule completed after three iterations in every run:
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule Iteration & Total rank & Sum change (\%) & L1 change (\%) \\ \midrule
+1 & 1.000000 & 0.000000 & 8.7758 \\
+2 & 1.000000 & 0.000000 & 0.9758 \\
+3 & 1.000000 & 0.000000 & 0.1158 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{tabular}{@{}rlrrr@{}}
+\toprule Rank & Page & PageRank & Incoming & Outgoing \\ \midrule
+1 & \texttt{5207.html} & 0.00019553 & 183 & 144 \\
+2 & \texttt{7443.html} & 0.00018286 & 196 & 86 \\
+3 & \texttt{7400.html} & 0.00017964 & 159 & 247 \\
+4 & \texttt{950.html} & 0.00017441 & 143 & 123 \\
+5 & \texttt{369.html} & 0.00017332 & 185 & 7 \\
+\bottomrule
+\end{tabular}
+\end{center}
+PageRank is not just incoming degree: a link's contribution depends on the
+source's rank and outgoing count. Therefore the page with the most incoming
+links need not have the largest PageRank.
+
+\subsection{Best closeness result}
+\begin{lstlisting}
+Best closeness centrality: page 10376.html  score = 0.50464735
+\end{lstlisting}
+The complete console logs, including progress messages and timings, are stored
+in the repository under \texttt{HW-2/results/}:
+\begin{itemize}
+\item \texttt{laptop-parallel-bucket-run.txt}
+\item \texttt{cloudshell-gzip-bucket-run.txt}
+\item \texttt{vm-parallel-bucket-run.txt}
+\end{itemize}
+Each corresponding exit-code file contains \texttt{0}.
+
+\clearpage
+\section{Runtime comparison and Cloud Shell downloads}
+Each completed run used 32 Google transfer-manager download workers, followed
+by single-threaded parsing and graph calculations. The laptop used an Apple
+M4 Pro with 24 GiB RAM and macOS 27.0. Cloud Shell reported an Intel Xeon at
+2.20 GHz. The \texttt{e2-medium} VM reported an AMD EPYC 7B12. These are single
+measurements rather than averages of repeated trials.
+
+\begin{tabularx}{\linewidth}{@{}Yrrr@{}}
+\toprule Stage (seconds) & Laptop & Cloud Shell & VM \\ \midrule
+Object listing & 10.92 & 28.59 & 4.69 \\
+Downloading & 111.23 & 136.99 & 112.08 \\
+Parsing and graph construction & 1.23 & 4.02 & 3.50 \\
+Combined loading stage & 123.99 & 170.32 & 120.99 \\
+Link statistics & 0.001 & 0.005 & 0.004 \\
+PageRank & 0.29 & 0.90 & 0.63 \\
+Closeness & 102.67 & 255.93 & 339.36 \\
+\textbf{Total wall time} & \textbf{226.96} & \textbf{427.16} & \textbf{460.99} \\
+\bottomrule
+\end{tabularx}
+The combined loading stage already includes listing, downloading, parsing,
+and other loader overhead; these component times must not be added twice.
+
+\subsection{Observed Cloud Shell problem and resolution}
+The laptop and VM used uncompressed objects under \texttt{hw2/}. In Cloud Shell,
+the uncompressed 32-worker run had completed only 1,200 files after about
+45 minutes, with low process CPU utilization. It later failed on
+\texttt{hw2/2701.html} after read timeouts exhausted its 300-second retry budget.
+The program reported failure rather than producing results from a partial graph.
+Increasing concurrency alone did not resolve the slow transfers.
+
+To reduce transferred bytes, the same generated files were uploaded under
+\texttt{hw2-gzip/} with gzip content encoding:
+\begin{lstlisting}
+gcloud storage cp 'files_12k/*.html' \
+  gs://thermal-circle-508221-m7-hw2/hw2-gzip/ \
+  --gzip-local=html --project=thermal-circle-508221-m7
+\end{lstlisting}
+This preserves the numbered object names and original decoded HTML. A test of
+\texttt{0.html} received 1,576 compressed bytes instead of 97,586 decoded bytes,
+about a 62-fold reduction. The compressed request took 0.19 seconds; a normal
+Python client request took 0.11 seconds and was verified equal to explicit gzip
+decompression. The full Cloud Shell run then succeeded using the same program.
+
+The low CPU usage during failed downloads, network read timeouts, and benefit
+from smaller responses support a transfer bottleneck in that Cloud Shell
+session. They do not identify a specific bandwidth limit or prove provider
+throttling. The files' repeated filler text explains their high compressibility.
+
+\subsection{Interpreting the measured differences}
+Cloud Shell used gzip while the other completed runs used uncompressed objects;
+the totals therefore are \textbf{not a controlled comparison of network speed}.
+The graph and algorithms were the same. Laptop and VM download times were nearly
+equal. Closeness was the main computation cost, and the laptop completed it
+fastest. CPU performance, available CPU resources, and different Python versions
+can contribute to this difference; the measurements do not isolate their effects.
+An earlier sequential laptop baseline took 2,069.55 seconds overall, including
+1,943.12 seconds loading. It used older download settings and is retained as a
+separate baseline rather than mixed with the 32-worker measurements.
+
+\clearpage
+\section{Cleanup, billing, and AI disclosure}
+\subsection{Deleting the VM}
+Before deleting the VM, the completed output, test log, package versions,
+environment details, and exit-code file were copied to the laptop. The saved
+configuration confirms \texttt{e2-medium}, \texttt{us-central1-a}, Debian 12,
+and the 10 GB boot disk. The following command deleted the VM and boot disk:
+\begin{lstlisting}
+gcloud compute instances delete hw2-vm \
+  --project=thermal-circle-508221-m7 --zone=us-central1-a \
+  --delete-disks=boot --quiet
+\end{lstlisting}
+The deletion command returned \texttt{Deleted} for \texttt{hw2-vm}.
+Afterward, the following instance and disk queries both returned \texttt{[]}:
+\begin{lstlisting}
+gcloud compute instances list \
+  --project=thermal-circle-508221-m7 \
+  --filter="name=hw2-vm" --format=json
+gcloud compute disks list \
+  --project=thermal-circle-508221-m7 \
+  --filter="name=hw2-vm" --format=json
+\end{lstlisting}
+The evidence is saved as \path{vm-deletion.txt},
+\path{vm-after-deletion.json}, and \path{vm-disks-after-deletion.json}.
+The bucket is retained so the instructor and teaching staff can run the code.
+
+\subsection{AI use and understanding}
+I used an AI coding assistant to help generate and revise the Python
+implementation and tests, explain the graph algorithms, troubleshoot Google
+Cloud setup and slow downloads, and prepare and format this report. The
+assistance included code suggestions for parsing, PageRank, BFS-based closeness,
+storage loading, and independent test cases. I ran the setup commands, tests,
+and analysis on my laptop, Cloud Shell, and the VM, and collected the resulting
+logs. The reported measurements are from those executions, not estimated or
+generated timing results.
+
+The main concepts behind the solution are:
+\begin{itemize}
+\item Each HTML page is a node, and each link occurrence is a directed edge.
+Duplicates affect link counts and PageRank contributions, but not shortest-path
+distances.
+\item PageRank distributes a source page's old rank among its outgoing links
+and adds the teleportation term. A page with no outgoing links distributes its
+rank uniformly. All updates use the previous iteration's vector.
+\item Conserving the sum of ranks does not mean that individual ranks have
+stopped changing. The program exposes the literal sum-only stopping rule and
+the documented additional L1 check used in the measured runs.
+\item BFS finds shortest paths in a graph with unit-length edges. Outward
+closeness combines the number of reachable pages with their distance sum.
+The bitmask version performs the same BFS level expansion using integer sets.
+\item Gzip reduces transfer size without changing the decoded HTML or graph.
+Parallelism is confined to library-managed downloads; graph processing follows
+after the downloads and uses one thread.
+\end{itemize}
+The validation uses manually specified small graphs, exact PageRank solutions,
+and an independent Floyd--Warshall distance calculation. These checks help
+detect errors in suggested code rather than relying only on plausible-looking
+results from the generated dataset.
+
+\clearpage
+\subsection{Cloud Billing evidence and reporting delay}
+The screenshot below was supplied on September 25, 2026. It shows the Billing
+Reports view grouped by project, with the row for
+\texttt{thermal-circle-508221-m7}. The selected setting is the current month;
+the actual-cost summary covers September 1--25, 2026. The forecast for
+September 1--30 is not used as actual spending.
+
+\begin{tabularx}{\linewidth}{@{}lY@{}}
+\toprule Item & Displayed value \\ \midrule
+Project & \texttt{thermal-circle-508221-m7} \\
+Actual-cost summary period & September 1--25, 2026 \\
+Usage cost & \$0.01 \\
+Other savings & \(-\$0.01\) \\
+Net project subtotal & \$0.00 \\
+\bottomrule
+\end{tabularx}
+
+\textbf{Scope and limitation.} These values are the displayed month-to-date
+project totals, not a separately attributed final HW2 bill. This project was
+also used for Homework 1, so the monthly view may contain unrelated earlier
+usage. Billing had not fully updated at report preparation. The instructor
+confirmed on Piazza that charges can be delayed by about 24 hours and allowed
+students to demonstrate how to obtain the information when the reported values
+are incomplete. The displayed \$0.00 therefore does not establish that HW2
+incurred no charges; a final HW2-specific total was not yet available.
+
+To obtain the assignment-period cost when the records update:
+\begin{enumerate}
+\item Select project \texttt{thermal-circle-508221-m7} in Google Cloud Console
+and open \textbf{Billing $\rightarrow$ Reports}.
+\item Set the custom usage-date range to September 24--25, 2026, covering the
+HW2 cloud setup and execution, and restrict the project filter to this project.
+\item Inspect actual costs grouped by service, including Cloud Storage and
+Compute Engine. Record usage cost, savings, and net subtotal, together with
+any other usage in the selected period. Do not substitute forecasted cost.
+\end{enumerate}
+
+\begin{center}
+\includegraphics[width=\linewidth,height=3.95in,keepaspectratio]{\BillingImage}
+\\[4pt]{\small Figure 1. Actual billing-console screenshot: current-month project
+usage cost, savings, and subtotal. Charges were subject to reporting delay.}
+\end{center}
+
+\clearpage
+\appendix
+\section{Parameters, source files, and references}
+\subsection{Command-line parameters}
+\begin{tabularx}{\linewidth}{@{}p{0.32\linewidth}Y@{}}
+\toprule Parameter & Meaning \\ \midrule
+\texttt{--bucket NAME} & Read numbered pages from this bucket. \\
+\texttt{--prefix PATH} & Object prefix; \texttt{hw2/} or \texttt{hw2-gzip/}. \\
+\texttt{--local DIRECTORY} & Read local files instead of a bucket; used for local checks. \\
+\texttt{--expected-nodes N} & Reject a loaded graph with a different number of nodes; use 12000. \\
+\texttt{--download-workers N} & Default 1; recorded final runs use 32 library-managed download workers. Does not parallelize graph processing. \\
+\texttt{--damping D} & PageRank damping factor; default 0.85. \\
+\texttt{--threshold PCT} & Stopping threshold in percent; default 0.5. \\
+\texttt{--convergence MODE} & \texttt{sum}: total-rank change; \texttt{l1}: vector movement; \texttt{both}: require both, the default and recorded mode. \\
+\texttt{--verbose-pr} & Display each iteration's rank sum and change measurements. \\
+\texttt{--authenticated} & Use application default credentials instead of anonymous access. Not required for this public bucket. \\
+\texttt{--skip-closeness} & Omit closeness for troubleshooting; not used in completed measurements. \\
+\bottomrule
+\end{tabularx}
+Exactly one of \texttt{--bucket} and \texttt{--local} is required. Parallel
+download workers apply only to bucket mode. Complete runs include closeness.
+
+\subsection{Source files and loading behavior}
+\begin{itemize}
+\item \texttt{generate.py}: supplied generator logic, with comments and formatting.
+\item \texttt{analyze.py}: command-line interface, storage/local loading, and timings.
+\item \texttt{graphlib\_hw.py}: graph representation, parsing, statistics, PageRank, and BFS.
+\item \texttt{test\_pagerank.py}, \texttt{test\_closeness.py},
+\texttt{test\_regressions.py}, and \texttt{test\_gcs\_io.py}: independent correctness tests and mocked storage tests.
+\item \texttt{upload\_to\_gcs.py}: an alternative sequential Python uploader.
+\item \texttt{results/}: measured output, environment records, package versions, tests, bucket IAM, and cleanup evidence.
+\end{itemize}
+The loader lists objects in pages of 100, requesting names, generations, and the
+next-page token. Parallel downloads are submitted in batches of 100 into a fresh
+temporary directory. Parsing starts only after all downloads succeed. The
+requests use a 10-second connection timeout, a 60-second read-inactivity timeout,
+and a 300-second retry budget; an in-progress request can extend beyond that
+budget. Completed runs do not reuse cached downloads. Temporary files are
+cleaned up on normal completion or handled exceptions.
+
+\subsection{References}
+\begin{enumerate}[label={[\arabic*]}]
+\item Google Cloud, \href{https://docs.cloud.google.com/storage/docs/access-control/making-data-public}{Making data public}: bucket IAM and \texttt{allUsers}.
+\item Google Cloud, \href{https://docs.cloud.google.com/python/docs/reference/storage/latest/google.cloud.storage.transfer_manager}{Python storage transfer manager}: library-managed downloads.
+\item Google Cloud, \href{https://docs.cloud.google.com/sdk/gcloud/reference/storage/cp}{\texttt{gcloud storage cp}} and \href{https://docs.cloud.google.com/storage/docs/transcoding}{gzip transcoding}: content encoding and compressed objects.
+\item Google Cloud, \href{https://docs.cloud.google.com/billing/docs/how-to/reports}{Cloud Billing Reports}: project/date filters and actual costs.
+\item Course assignment and instructor Piazza clarifications: nine statistics per direction, one course repository, and library-managed parallel downloads with single-threaded graph processing.
+\end{enumerate}
+\end{document}

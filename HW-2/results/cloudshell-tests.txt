@@ -1,0 +1,37 @@
+test_failed_download_never_returns_partial_graph (test_gcs_io.StorageLoadingTests.test_failed_download_never_returns_partial_graph) ... ok
+test_parallel_downloads_finish_before_parsing_and_match_graph (test_gcs_io.StorageLoadingTests.test_parallel_downloads_finish_before_parsing_and_match_graph) ... ok
+test_parallel_failure_removes_files_and_does_not_parse (test_gcs_io.StorageLoadingTests.test_parallel_failure_removes_files_and_does_not_parse) ... ok
+test_partial_metadata_listing_follows_next_page (test_gcs_io.StorageLoadingTests.test_partial_metadata_listing_follows_next_page) ... ok
+test_closeness_test_directed_line (test_regressions.ExistingTests.test_closeness_test_directed_line) ... ok
+test_closeness_test_isolated_node_zero (test_regressions.ExistingTests.test_closeness_test_isolated_node_zero) ... ok
+test_closeness_test_known_middle_value (test_regressions.ExistingTests.test_closeness_test_known_middle_value) ... ok
+test_closeness_test_multiplicity_ignored_for_distance (test_regressions.ExistingTests.test_closeness_test_multiplicity_ignored_for_distance) ... ok
+test_closeness_test_star_center_best (test_regressions.ExistingTests.test_closeness_test_star_center_best) ... ok
+test_closeness_test_undirected_triangle_uniform (test_regressions.ExistingTests.test_closeness_test_undirected_triangle_uniform) ... ok
+test_pagerank_test_dangling_node_conserves_mass (test_regressions.ExistingTests.test_pagerank_test_dangling_node_conserves_mass) ... ok
+test_pagerank_test_hub_gets_highest (test_regressions.ExistingTests.test_pagerank_test_hub_gets_highest) ... ok
+test_pagerank_test_known_three_node_values (test_regressions.ExistingTests.test_pagerank_test_known_three_node_values) ... ok
+test_pagerank_test_multiplicity_matters (test_regressions.ExistingTests.test_pagerank_test_multiplicity_matters) ... ok
+test_pagerank_test_sum_conserved (test_regressions.ExistingTests.test_pagerank_test_sum_conserved) ... ok
+test_pagerank_test_symmetric_cycle_uniform (test_regressions.ExistingTests.test_pagerank_test_symmetric_cycle_uniform) ... ok
+test_pagerank_test_two_node_closed_formula (test_regressions.ExistingTests.test_pagerank_test_two_node_closed_formula) ... ok
+test_both_closeness_algorithms_against_independent_oracle (test_regressions.RegressionTests.test_both_closeness_algorithms_against_independent_oracle) ... ok
+test_empty_missing_and_invalid_pages_rejected (test_regressions.RegressionTests.test_empty_missing_and_invalid_pages_rejected) ... ok
+test_exact_dangling_pagerank (test_regressions.RegressionTests.test_exact_dangling_pagerank) ... ok
+test_exact_nonsymmetric_pagerank (test_regressions.RegressionTests.test_exact_nonsymmetric_pagerank) ... ok
+test_literal_sum_stops_before_vector_settles (test_regressions.RegressionTests.test_literal_sum_stops_before_vector_settles) ... ok
+test_nine_statistics_per_direction (test_regressions.RegressionTests.test_nine_statistics_per_direction) ... ok
+test_nonconvergence_is_reported (test_regressions.RegressionTests.test_nonconvergence_is_reported) ... ok
+test_parser_counts_duplicates_and_self_links (test_regressions.RegressionTests.test_parser_counts_duplicates_and_self_links) ... ok
+test_public_bucket_and_prefix_selection (test_regressions.RegressionTests.test_public_bucket_and_prefix_selection) ... Listing objects (up to 100 per response)...
+Object listing time: 0.00s
+Found 2 numbered pages. Downloading sequentially...
+  downloading hw2/0.html (1/2)
+  ...read 2/2 files
+ok
+test_single_node (test_regressions.RegressionTests.test_single_node) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 0.060s
+
+OK
