@@ -16,14 +16,14 @@ objects from the bucket (not for any graph computation).
 Examples
 --------
 Read directly from the bucket (laptop / Cloud Shell / VM):
-    python3 analyze.py --bucket bu-cs528-you_bu_edu --prefix hw2/
+    python3 analyze.py --bucket thermal-circle-508221-m7-hw2 --prefix hw2/
 
 Read from a local directory instead of GCS (handy for testing):
     python3 analyze.py --local files_small
 
 Typical bucket layout expected:
-    gs://<bucket>/<prefix>/0.html
-    gs://<bucket>/<prefix>/1.html
+    gs://thermal-circle-508221-m7-hw2/hw2/0.html
+    gs://thermal-circle-508221-m7-hw2/hw2/1.html
     ...
 """
 import argparse
@@ -112,7 +112,7 @@ def print_link_stats(stats):
 def main():
     ap = argparse.ArgumentParser(description="CS528 HW2 graph analysis")
     src = ap.add_mutually_exclusive_group(required=True)
-    src.add_argument("--bucket", help="GCS bucket name (e.g. bu-cs528-you_bu_edu)")
+    src.add_argument("--bucket", help="GCS bucket name (e.g. thermal-circle-508221-m7-hw2)")
     src.add_argument("--local", help="Local directory of N.html files (testing)")
     ap.add_argument("--prefix", default="", help="Object prefix inside the bucket, e.g. hw2/")
     ap.add_argument("--damping", type=float, default=0.85, help="PageRank damping d (default 0.85)")

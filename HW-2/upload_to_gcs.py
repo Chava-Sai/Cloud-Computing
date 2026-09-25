@@ -3,12 +3,12 @@
 upload_to_gcs.py -- Copy a local directory of N.html files into a GCS bucket
 under a prefix. This is a convenience uploader; you may equivalently use:
 
-    gsutil -m cp -r files_12k/*.html gs://<bucket>/hw2/
+    gsutil -m cp -r files_12k/*.html gs://thermal-circle-508221-m7-hw2/hw2/
     # or
-    gcloud storage cp files_12k/*.html gs://<bucket>/hw2/
+    gcloud storage cp files_12k/*.html gs://thermal-circle-508221-m7-hw2/hw2/
 
 Usage:
-    python3 upload_to_gcs.py --bucket bu-cs528-you_bu_edu \
+    python3 upload_to_gcs.py --bucket thermal-circle-508221-m7-hw2 \
                              --local files_12k --prefix hw2/
 """
 import argparse
