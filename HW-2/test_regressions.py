@@ -117,16 +117,17 @@ class RegressionTests(unittest.TestCase):
 
     def test_public_bucket_and_prefix_selection(self):
         def blob(name, body):
-            return SimpleNamespace(name=name, download_as_text=lambda: body)
+            return SimpleNamespace(name=name, download_as_text=lambda **kwargs: body)
         blobs = [blob('hw2/0.html', '<a HREF="1.html">'), blob('hw2/1.html', ''),
                  blob('hw2/nested/0.html', '<a HREF="999.html">')]
-        fake_client = SimpleNamespace(list_blobs=lambda bucket, prefix: blobs)
+        fake_client = SimpleNamespace(list_blobs=lambda bucket, **kwargs: blobs)
         from unittest.mock import Mock
         client_class = Mock()
         client_class.create_anonymous_client.return_value = fake_client
         storage = SimpleNamespace(Client=client_class)
         modules = {'google': SimpleNamespace(cloud=SimpleNamespace(storage=storage)),
-                   'google.cloud': SimpleNamespace(storage=storage), 'google.cloud.storage': storage}
+                   'google.cloud': SimpleNamespace(storage=storage), 'google.cloud.storage': storage,
+                   'google.cloud.storage.retry': SimpleNamespace(DEFAULT_RETRY=Mock())}
         with patch.dict('sys.modules', modules):
             g, count = load_from_gcs('test-bucket', 'hw2')
         client_class.create_anonymous_client.assert_called_once_with()

@@ -46,6 +46,14 @@ venv, pip, and Git installed. For the package versions used in the laptop run,
 install `results/laptop-packages.txt` instead of `requirements.txt`.
 Google Cloud credentials are not required to analyze the public bucket.
 
+Object listing uses responses of at most 100 entries containing only names,
+generations, and the next-page token. Keeping that token allows the client to
+retrieve the entire directory. Downloads remain sequential. Network requests
+use a 10-second connection timeout and a 60-second read-inactivity timeout,
+with a 300-second retry budget for transient failures. An attempt already in
+progress may finish after the retry budget. Progress is printed during listing
+and after every 100 downloads; a failed download identifies its object name.
+
 ## Files
 
 | File | Purpose |
@@ -57,6 +65,7 @@ Google Cloud credentials are not required to analyze the public bucket.
 | `test_pagerank.py` | PageRank tests on small graphs with known properties. |
 | `test_closeness.py` | Closeness tests with manually calculated distances. |
 | `test_regressions.py` | Unified test discovery and additional correctness checks. |
+| `test_gcs_io.py` | SDK pagination and failed-download tests, with no network requests. |
 | `requirements.txt` | Direct dependency: `google-cloud-storage`. |
 | `results/` | Saved run output, test output, and environment details. |
 
@@ -185,8 +194,9 @@ single-threaded.
 
 ## Correctness tests
 
-Run all tests with `python3 -m unittest discover -v`. The suite contains 23
-tests and passed on both the laptop and Cloud Shell. Tests are independent
+Run all tests with `python3 -m unittest discover -v`. The suite contains 25
+tests. The original 23 tests passed on both the laptop and Cloud Shell; the
+expanded 25-test suite passed locally after the listing change. Tests are independent
 of the generated 12,000-page graph.
 
 PageRank checks include symmetric graphs, exact nonuniform scores from solved
@@ -198,6 +208,9 @@ Additional tests check parsing, statistics, dataset validation, and anonymous
 bucket loading.
 
 ## Recorded laptop results
+
+This recorded run used the previous loading settings: default listing responses
+and default network retries. The graph algorithms are unchanged.
 
 The complete bucket run used Python 3.13.7 on an Apple M4 Pro Mac with 24 GiB
 of memory. It loaded all 12,000 pages from the public bucket.

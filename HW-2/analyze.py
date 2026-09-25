@@ -65,27 +65,47 @@ def load_from_local(directory):
 def load_from_gcs(bucket_name, prefix, authenticated=False):
     """Read all N.html blobs under prefix from a GCS bucket. Returns (graph,n)."""
     from google.cloud import storage  # imported lazily so --local needs no SDK
+    from google.cloud.storage.retry import DEFAULT_RETRY
     client = storage.Client() if authenticated else storage.Client.create_anonymous_client()
     prefix = prefix.rstrip("/") + "/" if prefix else ""
+    request_timeout = (10, 60)  # connect timeout, then read-inactivity timeout
+    retry = DEFAULT_RETRY.with_timeout(300)
 
-    # First pass: list blobs and discover the node ids.
-    blobs = list(client.list_blobs(bucket_name, prefix=prefix))
+    # Small partial responses avoid downloading unnecessary object metadata.
+    # Keep nextPageToken so the SDK visits EVERY page, not just the first 100.
+    log("Listing objects (up to 100 per response)...")
+    blobs = client.list_blobs(
+        bucket_name, prefix=prefix, page_size=100,
+        fields="nextPageToken,items(name,generation)",
+        timeout=request_timeout, retry=retry,
+    )
     id_to_blob = {}
-    for b in blobs:
+    for listed, b in enumerate(blobs, 1):
         base = b.name[len(prefix):]
         if re.fullmatch(r"(0|[1-9][0-9]*)\.html", base):
             id_to_blob[int(base[:-5])] = b
+        if listed % 100 == 0:
+            log(f"  ...listed {listed} objects")
 
     ids = sorted(id_to_blob)
     validate_ids(ids)
     n = len(ids)
+    log(f"Found {n} numbered pages. Downloading sequentially...")
 
     g = WebGraph(n)
     # Second pass: download each object and parse its links (single-threaded).
     for k, i in enumerate(ids):
-        text = id_to_blob[i].download_as_text()
+        if k % 100 == 0:
+            log(f"  downloading {id_to_blob[i].name} ({k + 1}/{n})")
+        try:
+            text = id_to_blob[i].download_as_text(timeout=request_timeout, retry=retry)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Download failed for {id_to_blob[i].name}; {k}/{n} pages read. "
+                "This run is incomplete."
+            ) from exc
         g.set_out_links(i, parse_links(text))
-        if (k + 1) % 1000 == 0:
+        if (k + 1) % 100 == 0 or k + 1 == n:
             log(f"  ...read {k + 1}/{n} files")
     g.finalize()
     return g, n
