@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+from concurrent.futures import CancelledError
 from datetime import datetime, timedelta, timezone
 
 from google.api_core.exceptions import NotFound, PreconditionFailed
@@ -113,7 +114,10 @@ def main():
         future.result()
     except KeyboardInterrupt:
         future.cancel()
-        future.result()
+        try:
+            future.result(timeout=10)
+        except CancelledError:
+            pass
     finally:
         subscriber.close()
 
