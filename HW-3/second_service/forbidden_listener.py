@@ -4,7 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from google.api_core.exceptions import NotFound, PreconditionFailed
 from google.auth.credentials import Credentials
@@ -32,7 +32,8 @@ class GcloudImpersonatedCredentials(Credentials):
         if not self.token:
             raise RuntimeError("gcloud returned an empty impersonated token")
         # The default token lasts one hour; refresh well before expiry.
-        self.expiry = datetime.utcnow() + timedelta(minutes=45)
+        # google-auth expects a naive UTC expiry; form it without utcnow().
+        self.expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=45)
 
 
 def append_once(bucket, object_name, event, message_id):
