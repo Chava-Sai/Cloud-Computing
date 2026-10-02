@@ -12,7 +12,8 @@ service account `hw3-microservices@thermal-circle-508221-m7.iam.gserviceaccount.
 | `GET /0.html` | 200 and the contents of `hw2/0.html` |
 | `POST /` with JSON `{"file":"0.html"}` | 200 and the same contents |
 | GET or POST for a missing file | 404, text and structured logs |
-| PUT, DELETE, HEAD, CONNECT, OPTIONS, TRACE, PATCH | 501, text and structured logs |
+| PUT, DELETE, HEAD, OPTIONS, PATCH | 501, text and structured logs |
+| TRACE, CONNECT | Function code returns 501 if called directly; Cloud Run rejects these methods before delivery (live endpoint: 405 and 400, respectively) |
 | GET or POST with `X-country: Iran` (or any homework-forbidden country) | 400, plus a Pub/Sub notification |
 
 The homework country list is a **simulation**, not a statement of current
@@ -64,8 +65,14 @@ curl -i "$URL/0.html" -H 'X-country: Iran'
 curl -i "$URL/0.html" -H 'X-country: North Korea'
 ```
 
-For the 501 requirement, test each unsupported method with `curl -i -X METHOD`.
-For `HEAD`, `curl -I "$URL/0.html"` displays response headers without a body.
+For the 501 requirement, test PUT, DELETE, OPTIONS, and PATCH with
+`curl -i -X METHOD`; use `curl -I "$URL/0.html"` for HEAD. Google documents
+that Cloud Run does not deliver TRACE or CONNECT to services, so the deployed
+function cannot turn them into 501 responses or application log entries:
+https://docs.cloud.google.com/run/docs/known-issues#http_methods . Our live
+tests returned 405 for TRACE and 400 for CONNECT on both the `run.app` and
+`cloudfunctions.net` URLs. This is a documented platform limitation and an
+unmet literal part of the homework specification.
 
 ## Run the laptop subscriber
 
