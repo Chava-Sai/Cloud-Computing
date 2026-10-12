@@ -17,6 +17,8 @@ denials to its standard output.
   `systemd` services automatically when the VMs boot.
 - `create_vms.sh`: one-command creation of both service VMs and their supporting
   IAM, Pub/Sub, IP, and firewall resources.
+- `stress_client.sh`, `run_stress.sh`: run the supplied HTTP client on a third
+  VM at 1–4 concurrent processes and record 3-minute web VM resource samples.
 
 ## One-command deployment
 
@@ -67,3 +69,29 @@ bash -n create_vms.sh startup_web.sh startup_reporter.sh
 Live VM, Cloud Logging, Pub/Sub, client, stress-test, and billing evidence must
 be collected after deployment. The report will use actual results from those
 runs, not estimates presented as measured values.
+
+## Client VM and stress test
+
+Create the client VM separately with Ubuntu 24.04 LTS x86-64. The supplied
+Linux `http-client` requires GLIBC 2.38 or newer; Debian 12 is too old. The
+client needs no Google Cloud service account because it only calls the web VM.
+Upload the professor's Linux binary to Cloud Shell, copy it to the client VM,
+and make it executable. A 100-request functional check is:
+
+```bash
+gcloud compute ssh hw4-client --zone=us-central1-a \
+  --command='~/http-client -d WEB_STATIC_IP -b none -w none -n 100 -i 11999 -p 8080 -t 20'
+```
+
+From this directory in Cloud Shell, run one client count at a time:
+
+```bash
+PROJECT_ID=thermal-circle-508221-m7 bash run_stress.sh 1
+PROJECT_ID=thermal-circle-508221-m7 bash run_stress.sh 2
+PROJECT_ID=thermal-circle-508221-m7 bash run_stress.sh 3
+PROJECT_ID=thermal-circle-508221-m7 bash run_stress.sh 4
+```
+
+Each trial uses the supplied client without `-v`, runs for 180 seconds, and
+saves a web VM metric CSV and text summary under `stress-results/`. The script
+rejects client counts above four. It starts at most four client processes.
