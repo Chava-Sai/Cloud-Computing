@@ -16,6 +16,10 @@ if [[ ! -x "$HOME/http-client" ]]; then
   echo "The provided http-client is missing or not executable" >&2
   exit 2
 fi
+if ! command -v timeout >/dev/null 2>&1; then
+  echo "The timeout utility is required for bounded client batches" >&2
+  exit 2
+fi
 
 result_dir="$HOME/hw4-stress/$run_id"
 mkdir -p "$result_dir"
