@@ -66,9 +66,13 @@ python3 -m venv .venv
 bash -n create_vms.sh startup_web.sh startup_reporter.sh
 ```
 
-Live VM, Cloud Logging, Pub/Sub, client, stress-test, and billing evidence must
-be collected after deployment. The report will use actual results from those
-runs, not estimates presented as measured values.
+The services were deployed and verified in project
+`thermal-circle-508221-m7`. GET and POST returned 200 with 97,586 bytes for
+`0.html`; a missing file returned 404, PUT returned 501, and a request with
+`X-country: Iran` returned 400. Structured Cloud Logging entries had severity
+WARNING, ERROR, and CRITICAL respectively. The reporter VM printed the Iran
+denial to standard output. Browser screenshots captured the 200, 404, 501,
+and 400 cases for the separate PDF report.
 
 ## Client VM and stress test
 
@@ -95,3 +99,22 @@ PROJECT_ID=thermal-circle-508221-m7 bash run_stress.sh 4
 Each trial uses the supplied client without `-v`, runs for 180 seconds, and
 saves a web VM metric CSV and text summary under `stress-results/`. The script
 rejects client counts above four. It starts at most four client processes.
+
+## Measured results and cost
+
+The professor's client completed its separate 100-request run on `hw4-client`.
+The client binary is silent without `-v`, so its exit status does not list
+individual HTTP response codes. Four three-minute stress trials had zero
+failed client batches. A Cloud Logging query during those trials returned no
+logged 5xx responses; the server was not saturated within the four-client
+limit. The largest one-second samples during the four-client trial were
+28.57% CPU, 354.85 MiB memory, and 74.106 Mbps combined receive/transmit
+bandwidth. The PDF report contains the graph for all four client counts and
+discusses the non-monotonic mean CPU and bandwidth measurements.
+
+After billing data posted, the project-by-day report for October 11, 2026
+showed $0.03 usage cost, -$0.03 other savings, and a $0.00 subtotal for
+`thermal-circle-508221-m7`. This is the rounded total for the whole project
+on that day, so it cannot isolate HW4 if other workloads ran then. All three
+HW4 VMs were stopped after testing; disks and the reserved IP can still incur
+charges. The report PDF and Overleaf source are separate submission artifacts.
